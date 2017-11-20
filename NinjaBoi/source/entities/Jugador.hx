@@ -18,7 +18,18 @@ class Jugador extends FlxSprite
 	public function new(?X:Float=0, ?Y:Float=0, ?SimpleGraphic:FlxGraphicAsset) 
 	{
 		super(X, Y, SimpleGraphic);
-		makeGraphic(15, 15, 0xFF000000);
+		loadGraphic(AssetPaths.ninjaBoi__png, true, 96, 96);
+		scale.set(0.5,0.5);
+		updateHitbox();
+		animation.add("idle", [0, 1, 2, 3, 4, 5, 6, 7], 8, true);
+		animation.add("jump", [9], 8, false);
+		animation.add("fall", [10], 8, false);
+		animation.add("fell",[8],8,false);
+		animation.add("walk", [11, 12, 13, 14, 15], 8, true);
+		animation.add("attack", [16, 17, 17, 17], 8, false);
+		animation.add("die", [18, 19, 20, 21], 8, false);
+		
+		
 		
 		acceleration.y = Dios.gravedad;
 		maxVelocity.set(100, Dios.gravedad);
@@ -29,9 +40,17 @@ class Jugador extends FlxSprite
 		
 		fsm = new FlxFSM<FlxSprite>(this);
 		fsm.transitions
-		.add(Idle, Jump, Conditions.jump)
+		.add(Idle, Jumping, Conditions.jump)
+		.add(Jumping,Jump,Conditions.animationFinished)
+		.add(Idle, SideSwipe, Conditions.sideSwipe)
 		.add(Jump, Idle, Conditions.grounded)
 		.add(Jump, SideSwipe, Conditions.sideSwipe)
+		.add(Jump, Fall, Conditions.fall)
+		.add(Idle, Fall, Conditions.fall)
+		.add(Fall, Fell, Conditions.grounded)
+		.add(Fell,Idle,Conditions.animationFinished)
+		.add(SideSwipe, Idle, Conditions.animationFinished)
+		.add(SideSwipe, Fall, Conditions.animationFinishedFall)
 		.start(Idle);
 	}
 	override public function update(elapsed:Float):Void
@@ -55,18 +74,25 @@ class Conditions
 	{
 		return (FlxG.keys.justPressed.UP && Owner.isTouching(FlxObject.DOWN));
 	}
-	
+	public static function fall(Owner:FlxSprite):Bool
+	{
+		return Owner.velocity.y > 0;
+	}
 	public static function grounded(Owner:FlxSprite):Bool
 	{
-		return Owner.isTouching(FlxObject.DOWN);
+		return (Owner.isTouching(FlxObject.DOWN) || Owner.velocity.y == 0);
 	}
 	public static function animationFinished(Owner:FlxSprite):Bool
 	{
 		return Owner.animation.finished;
 	}
+	public static function animationFinishedFall(Owner:FlxSprite):Bool
+	{
+		return (Owner.animation.finished && Owner.velocity.y > 0);
+	}
 	public static function sideSwipe(Owner:FlxSprite):Bool
 	{
-		return (FlxG.keys.justPressed.Z && !Owner.isTouching(FlxObject.DOWN));
+		return FlxG.keys.justPressed.Z;
 	}
 }
 
@@ -74,7 +100,7 @@ class Idle extends FlxFSMState<FlxSprite>
 {
 	override public function enter(owner:FlxSprite, fsm:FlxFSM<FlxSprite>):Void 
 	{
-		//owner.animation.play("standing");
+		owner.animation.play("idle");
 	}
 	
 	override public function update(elapsed:Float, owner:FlxSprite, fsm:FlxFSM<FlxSprite>):Void 
@@ -83,14 +109,36 @@ class Idle extends FlxFSMState<FlxSprite>
 		if (FlxG.keys.pressed.LEFT || FlxG.keys.pressed.RIGHT)
 		{
 			owner.facing = FlxG.keys.pressed.LEFT ? FlxObject.LEFT : FlxObject.RIGHT;
-			//owner.animation.play("walking");
+			owner.animation.play("walk");
 			owner.acceleration.x = FlxG.keys.pressed.LEFT ? -300 : 300;
 		}
 		else
 		{
-			//owner.animation.play("standing");
-			owner.velocity.x *= 0.9;
+			owner.animation.play("idle");
+			owner.velocity.x = 0;
 		}
+	}
+}
+
+class Fall extends FlxFSMState<FlxSprite>
+{
+	override public function enter(owner:FlxSprite, fsm:FlxFSM<FlxSprite>):Void
+	{
+		owner.animation.play("fall");
+	}
+}
+class Fell extends FlxFSMState<FlxSprite>
+{
+	override public function enter(owner:FlxSprite, fsm:FlxFSM<FlxSprite>):Void
+	{
+		owner.animation.play("fell");
+	}
+}
+class Jumping extends FlxFSMState<FlxSprite>
+{
+	override public function enter(owner:FlxSprite, fsm:FlxFSM<FlxSprite>):Void
+	{
+		owner.animation.play("fell");
 	}
 }
 
@@ -98,13 +146,14 @@ class Jump extends FlxFSMState<FlxSprite>
 {
 	override public function enter(owner:FlxSprite, fsm:FlxFSM<FlxSprite>):Void 
 	{
-		//owner.animation.play("jumping");
-		owner.velocity.y = -200;
+		owner.animation.play("jump");
+		owner.velocity.y -= 400;
+		
 	}
 	
 	override public function update(elapsed:Float, owner:FlxSprite, fsm:FlxFSM<FlxSprite>):Void 
 	{
-		owner.acceleration.x = 0;
+		//owner.acceleration.x = 0;
 		if (FlxG.keys.pressed.LEFT || FlxG.keys.pressed.RIGHT)
 		{
 			owner.acceleration.x = FlxG.keys.pressed.LEFT ? -300 : 300;
@@ -117,14 +166,14 @@ class SideSwipe extends FlxFSMState<FlxSprite>
 	var inicio:Float;
 	override public function enter(owner:FlxSprite, fsm:FlxFSM<FlxSprite>):Void
 	{
-		//owner.animation.play("sideswipe");
+		owner.animation.play("attack");
 		inicio = owner.x;
-		owner.velocity.x = (owner.facing == FlxObject.LEFT) ? -200 : 200;
+		owner.velocity.x = (owner.facing == FlxObject.LEFT) ? -300 : 300;
 	}
 	
 	override public function update(elapsed:Float, owner:FlxSprite, fsm:FlxFSM<FlxSprite>):Void 
 	{
-		if (owner.x - inicio == 100 || inicio - owner.x == 100) 
+		if (owner.x - inicio == 200 || inicio - owner.x == 200) 
 		{
 			owner.velocity.x = 0;
 		}
