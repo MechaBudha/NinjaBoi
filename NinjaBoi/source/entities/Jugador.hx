@@ -6,6 +6,9 @@ import flixel.system.FlxAssets.FlxGraphicAsset;
 import flixel.addons.util.FlxFSM;
 import flixel.FlxG;
 import flixel.FlxObject;
+import flixel.effects.particles.FlxEmitter;
+import flixel.util.helpers.FlxRangeBounds;
+import flixel.util.FlxColor;
 
 /**
  * ...
@@ -54,6 +57,7 @@ class Jugador extends FlxSprite
 		.add(Fell, Idle,Conditions.animationFinished)
 		.add(SideSwipe, Idle, Conditions.animationFinished)
 		.add(SideSwipe, Fall, Conditions.animationFinishedFall)
+		.add(Idle, Die,Conditions.testDie)
 		.start(Idle);
 	}
 	override public function update(elapsed:Float):Void
@@ -117,6 +121,10 @@ class Conditions
 	public static function sideSwipe(Owner:Jugador):Bool
 	{
 		return FlxG.keys.justPressed.Z && Owner.getAtaque();
+	}
+	public static function testDie(Owner:Jugador):Bool
+	{
+		return FlxG.keys.justPressed.X;
 	}
 }
 
@@ -218,5 +226,22 @@ class SideSwipe extends FlxFSMState<Jugador>
 		{
 			owner.velocity.x = 0;
 		}
+	}
+}
+
+class Die extends FlxFSMState<Jugador>
+{
+	override public function enter(owner:Jugador, fms:FlxFSM<Jugador>):Void
+	{
+		owner.animation.play("die");
+		owner.velocity.x = 0;
+		var part = new FlxEmitter();
+		part.focusOn(owner);
+		part.allowCollisions = FlxObject.FLOOR;
+		part.makeParticles(2, 2, FlxColor.BLACK, 15);
+		part.start();
+		part.emitParticle();
+		//part.emitting = true;
+		
 	}
 }
