@@ -18,8 +18,11 @@ class Jugador extends FlxSprite
 {
 	private var fsm:FlxFSM<Jugador>;
 	private var ataque:Bool;
+	private var emisor:FlxEmitter;
+	private var attackFlag:Bool;
 	public function new(?X:Float=0, ?Y:Float=0, ?SimpleGraphic:FlxGraphicAsset) 
 	{
+		
 		super(X, Y, SimpleGraphic);
 		loadGraphic(AssetPaths.ninjaBoi__png, true, 96, 96);
 		scale.set(0.5,0.5);
@@ -42,6 +45,8 @@ class Jugador extends FlxSprite
 		setFacingFlip(FlxObject.RIGHT, false, false);
 		facing = FlxObject.RIGHT;
 		
+		attackFlag = false;
+		
 		fsm = new FlxFSM<Jugador>(this);
 		fsm.transitions
 		.add(Idle, Jumping, Conditions.jump)
@@ -57,7 +62,7 @@ class Jugador extends FlxSprite
 		.add(Fell, Idle,Conditions.animationFinished)
 		.add(SideSwipe, Idle, Conditions.animationFinished)
 		.add(SideSwipe, Fall, Conditions.animationFinishedFall)
-		.add(Idle, Die,Conditions.testDie)
+		//.add(Idle, Die,Conditions.testDie)
 		.start(Idle);
 	}
 	override public function update(elapsed:Float):Void
@@ -91,6 +96,14 @@ class Jugador extends FlxSprite
 	public function getAtaque():Bool
 	{
 		return ataque;
+	}
+	public function getFlag():Bool
+	{
+		return attackFlag;
+	}
+	public function setFlag(bl:Bool):Void
+	{
+		attackFlag = bl;
 	}
 }
 
@@ -134,6 +147,7 @@ class Idle extends FlxFSMState<Jugador>
 	{
 		owner.animation.play("idle");
 		owner.acceleration.y = Dios.gravedad;
+		owner.setFlag(false);
 	}
 	
 	override public function update(elapsed:Float, owner:Jugador, fsm:FlxFSM<Jugador>):Void 
@@ -171,6 +185,7 @@ class Attacking extends FlxFSMState<Jugador>
 		owner.velocity.x = 0;
 		owner.negarAtaque();
 		owner.animation.play("attacking");
+		owner.setFlag(true);
 	}
 }
 class Fell extends FlxFSMState<Jugador>
@@ -234,14 +249,6 @@ class Die extends FlxFSMState<Jugador>
 	override public function enter(owner:Jugador, fms:FlxFSM<Jugador>):Void
 	{
 		owner.animation.play("die");
-		owner.velocity.x = 0;
-		var part = new FlxEmitter();
-		part.focusOn(owner);
-		part.allowCollisions = FlxObject.FLOOR;
-		part.makeParticles(2, 2, FlxColor.BLACK, 15);
-		part.start();
-		part.emitParticle();
-		//part.emitting = true;
-		
+		owner.velocity.x = 0;		
 	}
 }
