@@ -13,9 +13,11 @@ import flixel.FlxObject;
 import flixel.FlxSprite;
 import entities.Enemigo;
 import flixel.math.FlxRandom;
+import flixel.util.helpers.FlxRangeBounds;
+import flixel.util.FlxColor;
 class PlayState extends FlxState
 {
-	//https://github.com/HaxeFlixel/flixel-demos/blob/master/Features/Particles/source/PlayState.hx
+	
 	private var jugador:Jugador;
 	private var map:FlxOgmoLoader;
 	private var mPiso:FlxTilemap;
@@ -51,7 +53,13 @@ class PlayState extends FlxState
 		puntAhoraTxt = new FlxText(0, 0, "Score: " + puntAhora, 36);
 		puntAhoraTxt.color = 0x0000FF;
 		add(puntAhoraTxt);
+		
 		add(jugador);
+		
+		//https://github.com/HaxeFlixel/flixel-demos/blob/master/Features/Particles/source/PlayState.hx
+		emisor = new FlxEmitter(FlxG.camera.width/2, FlxG.camera.height/2, 30);
+		add(emisor);
+		
 	}
 
 	override public function update(elapsed:Float):Void
@@ -121,7 +129,7 @@ class PlayState extends FlxState
 	
 	private function colisionEnemigo(jug:Jugador,ene:Enemigo)
 	{
-		if (jug.getFlag()) 
+		if (jug.getAttackFlag()) 
 		{
 			if (ene.x > jug.x && jug.facing == FlxObject.RIGHT) 
 			{
@@ -145,6 +153,11 @@ class PlayState extends FlxState
 	private function matarEnemigo(ene:Enemigo):Void
 	{
 		puntAhora += (r.int(15, 30));
+		emisor.focusOn(ene);
+		emisor.makeParticles(2,2,FlxColor.RED,30);
+		emisor.lifespan.set(1,1);
+		emisor.solid = true;
+		emisor.start(true);
 		enemyGroup.remove(ene);
 		ene.destroy();
 	}

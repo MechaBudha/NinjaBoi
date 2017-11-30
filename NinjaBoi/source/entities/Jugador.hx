@@ -20,6 +20,8 @@ class Jugador extends FlxSprite
 	private var ataque:Bool;
 	private var emisor:FlxEmitter;
 	private var attackFlag:Bool;
+	private var muerteFlag:Bool;
+	private var muertoFlag:Bool;
 	public function new(?X:Float=0, ?Y:Float=0, ?SimpleGraphic:FlxGraphicAsset) 
 	{
 		
@@ -46,7 +48,8 @@ class Jugador extends FlxSprite
 		facing = FlxObject.RIGHT;
 		
 		attackFlag = false;
-		
+		muerteFlag = false;
+		muertoFlag = false;
 		fsm = new FlxFSM<Jugador>(this);
 		fsm.transitions
 		.add(Idle, Jumping, Conditions.jump)
@@ -62,7 +65,14 @@ class Jugador extends FlxSprite
 		.add(Fell, Idle,Conditions.animationFinished)
 		.add(SideSwipe, Idle, Conditions.animationFinished)
 		.add(SideSwipe, Fall, Conditions.animationFinishedFall)
-		//.add(Idle, Die,Conditions.testDie)
+		.add(Idle, Die, Conditions.die)
+		.add(Fell, Die, Conditions.die)
+		.add(Fall, Die, Conditions.die)
+		.add(SideSwipe, Die, Conditions.die)
+		.add(Jump, Die, Conditions.die)
+		.add(Attacking, Die, Conditions.die)
+		.add(Jumping, Die, Conditions.die)
+		.add(Die, Dead, Conditions.animationFinished)
 		.start(Idle);
 	}
 	override public function update(elapsed:Float):Void
@@ -97,13 +107,29 @@ class Jugador extends FlxSprite
 	{
 		return ataque;
 	}
-	public function getFlag():Bool
+	public function getAttackFlag():Bool
 	{
 		return attackFlag;
 	}
-	public function setFlag(bl:Bool):Void
+	public function setAttackFlag(bl:Bool):Void
 	{
 		attackFlag = bl;
+	}
+	public function setMuerteFlag(bl:Bool):Void
+	{
+		muerteFlag = bl;
+	}
+	public function getMuerteFlag():Bool
+	{
+		return muerteFlag;
+	}
+	public function getMuertoFlag():Bool
+	{
+		return muertoFlag;
+	}
+	public function setMuertoFlag(bl:Bool):Void
+	{
+		muertoFlag = bl;
 	}
 }
 
@@ -135,9 +161,9 @@ class Conditions
 	{
 		return FlxG.keys.justPressed.Z && Owner.getAtaque();
 	}
-	public static function testDie(Owner:Jugador):Bool
+	public static function die(Owner:Jugador):Bool
 	{
-		return FlxG.keys.justPressed.X;
+		return Owner.getMuerteFlag();
 	}
 }
 
@@ -147,7 +173,7 @@ class Idle extends FlxFSMState<Jugador>
 	{
 		owner.animation.play("idle");
 		owner.acceleration.y = Dios.gravedad;
-		owner.setFlag(false);
+		owner.setAttackFlag(false);
 	}
 	
 	override public function update(elapsed:Float, owner:Jugador, fsm:FlxFSM<Jugador>):Void 
@@ -185,7 +211,7 @@ class Attacking extends FlxFSMState<Jugador>
 		owner.velocity.x = 0;
 		owner.negarAtaque();
 		owner.animation.play("attacking");
-		owner.setFlag(true);
+		owner.setAttackFlag(true);
 	}
 }
 class Fell extends FlxFSMState<Jugador>
@@ -250,5 +276,13 @@ class Die extends FlxFSMState<Jugador>
 	{
 		owner.animation.play("die");
 		owner.velocity.x = 0;		
+	}
+}
+
+class Dead extends FlxFSM<Jugador>
+{
+	override public function enter(owner:Jugador, fxm:FlxFSM<Jugador>):Void 
+	{
+		owner.setMuertoFlag = true;
 	}
 }
