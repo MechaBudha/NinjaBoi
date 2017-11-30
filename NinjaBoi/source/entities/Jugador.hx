@@ -2,14 +2,19 @@ package entities;
 
 
 import flixel.FlxSprite;
+import flixel.FlxState;
+import flixel.effects.particles.FlxEmitter;
 import flixel.system.FlxAssets.FlxGraphicAsset;
 import flixel.addons.util.FlxFSM;
 import flixel.FlxG;
 import flixel.FlxObject;
-import flixel.effects.particles.FlxEmitter;
 import flixel.util.helpers.FlxRangeBounds;
+import haxe.macro.CompilationServer.ContextOptions;
 import flixel.util.FlxColor;
-
+import flixel.addons.effects.FlxTrail;
+import flixel.tweens.FlxTween;
+import flixel.tweens.FlxTween.TweenOptions;
+import flixel.math.FlxPoint;
 /**
  * ...
  * @author TU MADRE
@@ -18,11 +23,15 @@ class Jugador extends FlxSprite
 {
 	private var fsm:FlxFSM<Jugador>;
 	private var ataque:Bool;
-	private var emisor:FlxEmitter;
 	private var attackFlag:Bool;
 	private var muerteFlag:Bool;
 	private var muertoFlag:Bool;
-	public function new(?X:Float=0, ?Y:Float=0, ?SimpleGraphic:FlxGraphicAsset) 
+	private var cargaUlti:Int;
+	private var ultFlag:Bool;
+	private var emisor:FlxEmitter;
+	public var trail:FlxTrail;
+	public var estado:PlayState;
+	public function new(?X:Float=0, ?Y:Float=0, ?SimpleGraphic:FlxGraphicAsset, _estado:PlayState) 
 	{
 		
 		super(X, Y, SimpleGraphic);
@@ -38,8 +47,6 @@ class Jugador extends FlxSprite
 		animation.add("attacking", [16], 8, false);
 		animation.add("die", [18, 19, 20, 21], 8, false);
 		
-		ataque = true;
-		
 		//acceleration.y = Dios.gravedad;
 		maxVelocity.set(100, Dios.gravedad);
 		
@@ -50,6 +57,15 @@ class Jugador extends FlxSprite
 		attackFlag = false;
 		muerteFlag = false;
 		muertoFlag = false;
+		ataque = true;
+		cargaUlti = 0;
+		ultFlag = false;
+		
+		emisor = new FlxEmitter(this.x,this.y,100);
+		estado = _estado;
+		estado.add(emisor);
+		trail = new FlxTrail(this, null, 15, 5);
+		
 		fsm = new FlxFSM<Jugador>(this);
 		fsm.transitions
 		.add(Idle, Jumping, Conditions.jump)
@@ -73,6 +89,12 @@ class Jugador extends FlxSprite
 		.add(Attacking, Die, Conditions.die)
 		.add(Jumping, Die, Conditions.die)
 		.add(Die, Dead, Conditions.animationFinished)
+		.add(Idle, Ulteando, Conditions.ultear)
+		.add(Fall, Ulteando, Conditions.ultear)
+		.add(Jump, Ulteando, Conditions.ultear)
+		.add(SideSwipe, Ulteando, Conditions.ultear)
+		.add(Ulteando, Ultear, Conditions.ulteando)
+		.add(Ultear, Idle,Conditions.fall)
 		.start(Idle);
 	}
 	override public function update(elapsed:Float):Void
@@ -131,6 +153,41 @@ class Jugador extends FlxSprite
 	{
 		muertoFlag = bl;
 	}
+	public function cargarUlti(carga:Int):Void
+	{
+		cargaUlti += carga;
+		if (cargaUlti >= 300) 
+		{
+			cargaUlti = 300;
+		}
+	}
+	public function descargarUlt():Void
+	{
+		cargaUlti = 0;
+	}
+	public function getCargaUlti():Int
+	{
+		return cargaUlti;
+	}
+	public function getUltFlag():Bool
+	{
+		return ultFlag;
+	}
+	public function setUltFlag(bl:Bool):Void
+	{
+		ultFlag = bl;
+	}
+	public function explode():Void
+	{
+		descargarUlt();
+		FlxG.camera.shake(0.05, 0.2);
+		emisor.focusOn(this);
+		emisor.makeParticles(2,2,FlxColor.RED,100);
+		emisor.lifespan.set(1, 5);
+		emisor.speed.set(100);
+		emisor.solid = true;
+		emisor.start(true);
+	}
 }
 
 //https://github.com/HaxeFlixel/flixel-demos/blob/master/Features/FlxFSM/source/Slime.hx
@@ -165,6 +222,15 @@ class Conditions
 	{
 		return Owner.getMuerteFlag();
 	}
+	public static function ultear(Owner:Jugador):Bool
+	{
+		return (Owner.getCargaUlti() >= 300) && FlxG.keys.justPressed.X;
+		//return FlxG.keys.justPressed.X;
+	}
+	public static function ulteando(Owner:Jugador):Bool
+	{
+		return (Owner.x == FlxG.camera.width / 2 - (Owner.width/2)) && (Owner.y == FlxG.camera.height / 2 - (Owner.height/2));
+	}
 }
 
 class Idle extends FlxFSMState<Jugador>
@@ -174,6 +240,7 @@ class Idle extends FlxFSMState<Jugador>
 		owner.animation.play("idle");
 		owner.acceleration.y = Dios.gravedad;
 		owner.setAttackFlag(false);
+		owner.setUltFlag(false);
 	}
 	
 	override public function update(elapsed:Float, owner:Jugador, fsm:FlxFSM<Jugador>):Void 
@@ -193,7 +260,6 @@ class Idle extends FlxFSMState<Jugador>
 		}
 	}
 }
-//atlerar caja con width y heigh, offset.
 class Fall extends FlxFSMState<Jugador>
 {
 	override public function enter(owner:Jugador, fsm:FlxFSM<Jugador>):Void
@@ -279,10 +345,30 @@ class Die extends FlxFSMState<Jugador>
 	}
 }
 
-class Dead extends FlxFSM<Jugador>
+class Dead extends FlxFSMState<Jugador>
 {
 	override public function enter(owner:Jugador, fxm:FlxFSM<Jugador>):Void 
 	{
-		owner.setMuertoFlag = true;
+		owner.setMuertoFlag(true);
+	}
+}
+
+class Ulteando extends FlxFSMState<Jugador>
+{
+	override public function enter(owner:Jugador, fxm:FlxFSM<Jugador>):Void 
+	{
+		owner.setUltFlag(true);
+		owner.animation.play("idle");
+		FlxTween.linearMotion(owner, owner.x, owner.y, FlxG.camera.width / 2 - (owner.width/2), FlxG.camera.height / 2 - (owner.height/2), 1, true);
+		owner.estado.add(owner.trail);
+	}
+}
+class Ultear extends FlxFSMState<Jugador>
+{
+	override public function enter(owner:Jugador, fxm:FlxFSM<Jugador>):Void
+	{
+		owner.explode();
+		owner.estado.remove(owner.trail);
+		owner.estado.ultear();
 	}
 }

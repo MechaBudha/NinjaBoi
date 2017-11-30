@@ -15,6 +15,7 @@ import entities.Enemigo;
 import flixel.math.FlxRandom;
 import flixel.util.helpers.FlxRangeBounds;
 import flixel.util.FlxColor;
+import flixel.ui.FlxBar;
 class PlayState extends FlxState
 {
 	
@@ -30,6 +31,7 @@ class PlayState extends FlxState
 	private var contador:Float;
 	private var esperar:Float;
 	private var r:FlxRandom;
+	private var ultBar:FlxBar;
 	override public function create():Void
 	{
 		super.create();
@@ -48,18 +50,21 @@ class PlayState extends FlxState
 		
 		enemyGroup = new FlxTypedGroup<Enemigo>();
 		r = new FlxRandom();
+		//https://github.com/HaxeFlixel/flixel-demos/blob/master/Features/Particles/source/PlayState.hx
+		emisor = new FlxEmitter(FlxG.camera.width/2, FlxG.camera.height/2, 30);
+		add(emisor);
+		
 		init();
 		
 		puntAhoraTxt = new FlxText(0, 0, "Score: " + puntAhora, 36);
 		puntAhoraTxt.color = 0x0000FF;
 		add(puntAhoraTxt);
 		
-		add(jugador);
 		
-		//https://github.com/HaxeFlixel/flixel-demos/blob/master/Features/Particles/source/PlayState.hx
-		emisor = new FlxEmitter(FlxG.camera.width/2, FlxG.camera.height/2, 30);
-		add(emisor);
 		
+		ultBar = new FlxBar(puntAhoraTxt.width + 50 ,50, FlxBarFillDirection.LEFT_TO_RIGHT, 300, 50, jugador, "cargaUlti", 0, 300, true);
+		ultBar.y -= ultBar.height;
+		add(ultBar);
 	}
 
 	override public function update(elapsed:Float):Void
@@ -70,16 +75,19 @@ class PlayState extends FlxState
 		FlxG.collide(jugador, enemyGroup, colisionEnemigo);
 		puntAhoraTxt.text = "Score: " + puntAhora;
 	}
-	private function init():Void
+	public function init():Void
 	{
 		puntAhora = 0;
-		jugador = new Jugador();
+		jugador = new Jugador(this);
+		jugador.descargarUlt();
 		jugador.screenCenter();
+		add(jugador);
 		tiempo = 0;
 		esperar = 0;
 		contador = 10;
 		for (i in 0 ... enemyGroup.length -1) 
 		{
+			enemyGroup.members[i].destroy();
 			enemyGroup.remove(enemyGroup.members[i]);
 			remove(enemyGroup.members[i]);
 		}
@@ -98,7 +106,7 @@ class PlayState extends FlxState
 	}
 	private function crearRandomEnemy():Void
 	{
-		var enemy:Enemigo = new Enemigo(jugador);
+		var enemy:Enemigo = new Enemigo(jugador, this);
 		switch (r.int(0,5)) 
 		{
 			case 0:
@@ -148,17 +156,23 @@ class PlayState extends FlxState
 	}
 	private function matarJugador():Void
 	{
-		jugador.destroy();
+		if (!jugador.getUltFlag()) 
+		{
+			openSubState(new Muerte(this));
+		}
 	}
 	private function matarEnemigo(ene:Enemigo):Void
 	{
-		puntAhora += (r.int(15, 30));
-		emisor.focusOn(ene);
-		emisor.makeParticles(2,2,FlxColor.RED,30);
-		emisor.lifespan.set(1,1);
-		emisor.solid = true;
-		emisor.start(true);
-		enemyGroup.remove(ene);
+		var punt = r.int(15, 30);
+		puntAhora += punt;
+		if (!jugador.getUltFlag()) 
+		{
+			jugador.cargarUlti(punt);
+		}
 		ene.destroy();
+	}
+	public function ultear():Void
+	{
+		enemyGroup.forEachAlive(matarEnemigo);
 	}
 }
